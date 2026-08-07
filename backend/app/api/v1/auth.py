@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
 
 from app.database.database import get_db
 from app.schemas.auth import LoginRequest, TokenResponse
@@ -53,6 +54,29 @@ def login(
 
     except ValueError as e:
 
+        raise HTTPException(
+            status_code=401,
+            detail=str(e),
+        )
+
+@router.post("/token")
+def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        token = login_user(
+            db,
+            form_data.username,   # email goes here
+            form_data.password,
+        )
+
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+        }
+
+    except ValueError as e:
         raise HTTPException(
             status_code=401,
             detail=str(e),
