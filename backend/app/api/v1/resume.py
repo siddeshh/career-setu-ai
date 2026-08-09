@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.services.resume_parser import extract_text_from_pdf
 from app.database.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
@@ -43,11 +44,14 @@ def upload_resume(
     with open(file_path, "wb") as buffer:
         buffer.write(file.file.read())
 
+    extracted_text = extract_text_from_pdf(str(file_path))
+
     resume = create_resume(
         db=db,
         user_id=current_user.id,
         file_name=file.filename,
         file_path=str(file_path),
+        extracted_text=extracted_text,
     )
 
     return {

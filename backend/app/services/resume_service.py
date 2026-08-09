@@ -6,12 +6,14 @@ def create_resume(
         db: Session,
         user_id,
         file_name: str,
-        file_path: str
+        file_path: str,
+        extracted_text: str,
 ):
     resume = Resume(
         user_id=user_id,
         file_name=file_name,
-        file_path=file_path
+        file_path=file_path,
+        extracted_text=extracted_text
     )
 
     db.add(resume)

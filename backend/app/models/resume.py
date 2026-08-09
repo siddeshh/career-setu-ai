@@ -1,6 +1,6 @@
 import uuid 
 
-from sqlalchemy import Column, DateTime, ForeignKey, String
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -29,6 +29,11 @@ class Resume(Base):
     file_path = Column(
         String(500),
         nullable=False,
+    )
+
+    extracted_text = Column(
+        Text,
+        nullable=True,
     )
 
     created_at = Column(
