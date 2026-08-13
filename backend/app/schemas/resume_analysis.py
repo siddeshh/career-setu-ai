@@ -12,6 +12,15 @@ class ProjectAnalysis(BaseModel):
     url: str | None = None
 
 
+class ExperienceAnalysis(BaseModel):
+    company: str | None = None
+    role: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    description: str | None = None
+    skills: list[str] = []
+
+
 class ResumeAnalysis(BaseModel):
     full_name: str | None = None
     email: str | None = None
@@ -20,7 +29,7 @@ class ResumeAnalysis(BaseModel):
 
     skills: list[str] = []
     education: list[str] = []
-    experience: list[str] = []
+    experience: list[ExperienceAnalysis] = []
     projects: list[ProjectAnalysis] = []
     certifications: list[str] = []
     achievements: list[str] = []

@@ -1,6 +1,7 @@
 import re
 
 from app.schemas.resume_analysis import (
+    ExperienceAnalysis,
     ProjectAnalysis,
     ResumeAnalysis,
 )
@@ -94,6 +95,7 @@ DATE_PATTERNS = [
 
 
 KNOWN_SKILLS = [
+    # Programming
     "Python",
     "Java",
     "JavaScript",
@@ -104,6 +106,11 @@ KNOWN_SKILLS = [
     "Go",
     "Rust",
 
+    # Data Science / AI
+    "Pandas",
+    "NumPy",
+    "Matplotlib",
+    "Seaborn",
     "Machine Learning",
     "Deep Learning",
     "Artificial Intelligence",
@@ -114,6 +121,7 @@ KNOWN_SKILLS = [
     "LLM",
     "RAG",
 
+    # Backend / Web
     "FastAPI",
     "Flask",
     "Django",
@@ -121,45 +129,78 @@ KNOWN_SKILLS = [
     "Next.js",
     "Node.js",
     "Express",
+    "HTML",
+    "CSS",
+    "Tailwind CSS",
 
+    # Databases
     "PostgreSQL",
     "MySQL",
     "MongoDB",
     "Redis",
+    "SQL",
+    "Supabase",
+    "Firebase",
 
+    # Cloud / DevOps
     "Docker",
     "Kubernetes",
     "AWS",
     "Azure",
     "GCP",
+    "Terraform",
+    "Jenkins",
+    "GitHub Actions",
+    "Git",
+    "GitHub",
+    "Linux",
 
+    # GenAI / LLM
     "Ollama",
     "LangChain",
+    "LangGraph",
+    "CrewAI",
     "Hugging Face",
+    "OpenAI",
+    "Gemini",
+    "Claude",
+
+    # ML Frameworks
     "PyTorch",
     "TensorFlow",
     "Scikit-learn",
+    "XGBoost",
+    "LightGBM",
 
+    # Vector / Search
     "Vector Databases",
     "Qdrant",
     "FAISS",
+    "Semantic Search",
 
+    # AI / Speech / Vision
     "Whisper",
     "Faster Whisper",
     "OpenCV",
-
     "Speech Recognition",
     "Text-to-Speech",
     "Voice Synthesis",
     "Voice Cloning",
 
-    "Semantic Search",
+    # Messaging
+    "Apache Kafka",
+    "RabbitMQ",
+
+    # ORM / Backend Tools
+    "Prisma",
+    "SQLAlchemy",
+
+    # Career-Setu specific
     "Secure AI Deployment",
     "AI Automation",
     "Report Generation",
     "Resume Analysis",
-]
-
+    ]
 
 def normalize_line(line: str) -> str:
     """Normalize text extracted from a PDF."""
@@ -510,6 +551,105 @@ def split_skills(
 
     return found_skills
 
+def normalize_skill_name(skill: str) -> str:
+    """
+    Normalize common skill naming variations.
+    """
+
+    aliases = {
+        "sementic search": "Semantic Search",
+        "semantic searching": "Semantic Search",
+        "faster-whisper": "Faster Whisper",
+        "generative ai": "Generative AI",
+        "text to speech": "Text-to-Speech",
+        "speech to text": "Speech Recognition",
+        "voice synthesis": "Voice Synthesis",
+        "voice cloning": "Voice Cloning",
+    }
+
+    normalized = skill.strip()
+
+    return aliases.get(
+        normalized.lower(),
+        normalized,
+    )
+
+def normalize_project_skills(
+    skill_lines: list[str],
+) -> list[str]:
+    """
+    Convert raw project skill lines into clean individual skills.
+    """
+
+    skills = []
+
+    for line in skill_lines:
+
+        known = split_skills([line])
+
+        for skill in known:
+            normalized = normalize_skill_name(skill)
+
+            if normalized not in skills:
+                skills.append(normalized)
+
+    return unique_skills(skills)
+
+def extract_unknown_skills(text: str) -> list[str]:
+    """
+    Detect potential skills that are not present in KNOWN_SKILLS.
+
+    This is a heuristic fallback. The LLM layer will later
+    perform more reliable semantic skill extraction.
+    """
+
+    if not text:
+        return []
+
+    # Normalize common separators
+    cleaned = re.sub(
+        r"[|,/;•·]+",
+        ",",
+        text,
+    )
+
+    # Split comma-separated values
+    candidates = []
+
+    for part in cleaned.split(","):
+        part = part.strip()
+
+        if not part:
+            continue
+
+        # Split long whitespace-separated skill sequences
+        words = part.split()
+
+        if len(words) <= 4:
+            candidates.append(part)
+
+    return candidates
+
+
+
+def unique_skills(skills: list[str]) -> list[str]:
+    """
+    Remove duplicate skills while preserving order.
+    """
+
+    result = []
+    seen = set()
+
+    for skill in skills:
+
+        key = skill.lower().strip()
+
+        if key not in seen:
+            seen.add(key)
+            result.append(skill)
+
+    return result
+
 def extract_project_candidates(text: str) -> list[str]:
     """
     Extract possible project-related lines without assuming
@@ -606,12 +746,17 @@ def structure_project_candidates(
             or None
         )
 
+        current["skills"] = unique_skills(
+            current["skills"]
+        )
+
         projects.append(
             ProjectAnalysis(**current)
         )
 
         current = None
         description_lines = []
+
 
     for line in candidates:
 
@@ -707,7 +852,9 @@ def structure_project_candidates(
                 )[1].strip()
 
                 if value:
-                    current["skills"].append(value)
+                    current["skills"].extend(
+                        normalize_project_skills([value])
+                )
 
             continue
 
@@ -728,7 +875,9 @@ def structure_project_candidates(
 
             else:
 
-                current["skills"].append(line)
+                current["skills"].extend(
+                    normalize_project_skills([line])
+                )
 
                 continue
 
@@ -757,12 +906,353 @@ def structure_project_candidates(
 
     return projects
 
+def extract_experience_candidates(text: str) -> list[str]:
+    """
+    Extract lines belonging to the experience section.
+    Supports common resume section names.
+    """
+
+    lines = [
+        normalize_line(line)
+        for line in text.splitlines()
+        if normalize_line(line)
+    ]
+
+    experience_headings = {
+        "experience",
+        "work experience",
+        "professional experience",
+        "employment history",
+        "work history",
+        "career history",
+        "internships",
+        "internship experience",
+    }
+
+    candidates = []
+    inside_experience = False
+
+    for line in lines:
+
+        normalized = (
+            line.lower()
+            .strip()
+            .rstrip(":")
+        )
+
+        if normalized in experience_headings:
+            inside_experience = True
+            continue
+
+        if not inside_experience:
+            continue
+
+        if normalized in MAJOR_SECTION_HEADINGS:
+            break
+
+        candidates.append(line)
+
+    return candidates
+
+def structure_experience_candidates(
+    candidates: list[str],
+) -> list[ExperienceAnalysis]:
+    """
+    Convert experience candidate lines into structured
+    experience records.
+    """
+
+    experiences = []
+
+    current = None
+    description_lines = []
+
+    date_range_pattern = re.compile(
+        r"^"
+        r"(?P<start>"
+        r"(?:\d{1,2}\s+)?"
+        r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+        r"[a-z]*"
+        r"(?:,\s*)?\s*\d{4}"
+        r"|"
+        r"\d{1,2}/\d{4}"
+        r"|"
+        r"\d{4}"
+        r")"
+        r"\s*[-–]\s*"
+        r"(?P<end>"
+        r"(?:\d{1,2}\s+)?"
+        r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+        r"[a-z]*"
+        r"(?:,\s*)?\s*\d{4}"
+        r"|"
+        r"\d{1,2}/\d{4}"
+        r"|"
+        r"\d{4}"
+        r"|"
+        r"Present|Current"
+        r")"
+        r"(?P<rest>.*)$",
+        re.IGNORECASE,
+    )
+
+    def save_current_experience():
+        nonlocal current
+        nonlocal description_lines
+
+        if current is None:
+            return
+
+        current["description"] = (
+            " ".join(description_lines).strip()
+            or None
+        )
+
+        current["skills"] = unique_skills(
+            current["skills"]
+        )
+
+        experiences.append(
+            ExperienceAnalysis(**current)
+        )
+
+        current = None
+        description_lines = []
+
+    for line in candidates:
+
+        lower = line.lower().strip()
+
+        # --------------------------------------------
+        # New experience detected by date range
+        # --------------------------------------------
+
+        match = date_range_pattern.match(line)
+
+        if match:
+
+            save_current_experience()
+
+            current = {
+                "company": None,
+                "role": None,
+                "start_date": match.group("start").strip(),
+                "end_date": match.group("end").strip(),
+                "description": None,
+                "skills": [],
+            }
+
+            rest = match.group("rest").strip()
+
+            if rest:
+                current["role"] = rest
+
+            continue
+
+        if current is None:
+            continue
+
+        # --------------------------------------------
+        # Skills
+        # --------------------------------------------
+
+        if lower.startswith("key skills:"):
+
+            value = line.split(
+                ":",
+                1,
+            )[1].strip()
+
+            if value:
+                current["skills"].extend(
+                    normalize_project_skills(
+                        [value]
+                    )
+                )
+
+            continue
+
+        # --------------------------------------------
+        # Company
+        # --------------------------------------------
+
+        if lower.startswith("company:"):
+
+            current["company"] = line.split(
+                ":",
+                1,
+            )[1].strip()
+
+            continue
+
+        # --------------------------------------------
+        # Role
+        # --------------------------------------------
+
+        if lower.startswith("role:"):
+
+            current["role"] = line.split(
+                ":",
+                1,
+            )[1].strip()
+
+            continue
+
+        # --------------------------------------------
+        # Description
+        # --------------------------------------------
+
+        if (
+            lower.startswith("developed ")
+            or lower.startswith("worked ")
+            or lower.startswith("built ")
+            or lower.startswith("responsible ")
+            or lower.startswith("created ")
+            or lower.startswith("implemented ")
+            or lower.startswith("managed ")
+        ):
+
+            description_lines.append(line)
+            continue
+
+        # Continue description
+        if description_lines:
+            description_lines.append(line)
+
+    save_current_experience()
+
+    return experiences
+
+def extract_simple_section(
+    text: str,
+    headings: set[str],
+) -> list[str]:
+    """
+    Extract a simple resume section such as
+    certifications, achievements, or languages.
+    """
+
+    lines = [
+        normalize_line(line)
+        for line in text.splitlines()
+        if normalize_line(line)
+    ]
+
+    results = []
+    inside_section = False
+
+    for line in lines:
+
+        normalized = (
+            line.lower()
+            .strip()
+            .rstrip(":")
+        )
+
+        if normalized in headings:
+            inside_section = True
+            continue
+
+        if inside_section and normalized in MAJOR_SECTION_HEADINGS:
+            break
+
+        if inside_section:
+            results.append(line)
+
+    return results
+
+def extract_certifications_data(
+    text: str,
+) -> list[str]:
+
+    return extract_simple_section(
+        text,
+        {
+            "certifications",
+            "certificates",
+            "professional certifications",
+        },
+    )
+
+def extract_achievements_data(
+    text: str,
+) -> list[str]:
+
+    return extract_simple_section(
+        text,
+        {
+            "achievements",
+            "awards",
+            "honors",
+            "honours",
+        },
+    )
+
+def extract_languages_data(
+    text: str,
+) -> list[str]:
+
+    return extract_simple_section(
+        text,
+        {
+            "languages",
+            "language proficiency",
+        },
+    )
+
+def extract_summary(text: str) -> str | None:
+    """
+    Extract a resume summary/profile section.
+    """
+
+    summary_headings = {
+        "summary",
+        "professional summary",
+        "profile",
+        "professional profile",
+        "career objective",
+        "objective",
+        "about me",
+    }
+
+    lines = [
+        normalize_line(line)
+        for line in text.splitlines()
+        if normalize_line(line)
+    ]
+
+    results = []
+    inside_summary = False
+
+    for line in lines:
+        normalized = (
+            line.lower()
+            .strip()
+            .rstrip(":")
+        )
+
+        if normalized in summary_headings:
+            inside_summary = True
+            continue
+
+        if inside_summary and normalized in MAJOR_SECTION_HEADINGS:
+            break
+
+        if inside_summary:
+            results.append(line)
+
+    if not results:
+        return None
+
+    return " ".join(results).strip()
+
 def analyze_resume_text(
     text: str,
 ) -> ResumeAnalysis:
     """
     Convert extracted resume text into structured resume data.
     """
+    summary = extract_summary(text)
 
     skill_lines = extract_project_skills(text)
 
@@ -772,18 +1262,35 @@ def analyze_resume_text(
         project_candidates
     )
 
-    return ResumeAnalysis(
-        full_name=extract_name(text),
-        email=extract_email(text),
-        phone=extract_phone(text),
-
-        skills=split_skills(skill_lines),
-
-        education=extract_education(text),
-
-        experience=extract_experience(text),
-
-        projects=projects,
-
-        certifications=extract_certifications(text),
+    experience_candidates = extract_experience_candidates(
+        text
     )
+
+    experiences = structure_experience_candidates(
+        experience_candidates
+    )   
+
+    return ResumeAnalysis(
+    full_name=extract_name(text),
+    email=extract_email(text),
+    phone=extract_phone(text),
+    summary=summary,
+
+    skills=normalize_project_skills(
+        skill_lines
+    ),
+
+    education=extract_education(text),
+
+    experience=experiences,
+
+    projects=projects,
+
+    certifications=extract_certifications_data(text),
+
+    achievements=extract_achievements_data(text),
+
+    languages=extract_languages_data(text),
+
+    
+)
