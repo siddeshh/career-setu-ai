@@ -34,3 +34,33 @@ class ResumeAnalysis(BaseModel):
     certifications: list[str] = []
     achievements: list[str] = []
     languages: list[str] = []
+
+
+class ScoreBreakdown(BaseModel):
+    contact_information: int = 0
+    summary: int = 0
+    skills: int = 0
+    education: int = 0
+    experience: int = 0
+    projects: int = 0
+    certifications: int = 0
+    completeness: int = 0
+
+
+class ResumeQuality(BaseModel):
+    quality_score: int = 0
+    ats_score: int = 0
+    content_score: int = 0
+    formatting_score: int = 0
+    issues: list[str] = []
+    recommendations: list[str] = []
+
+
+class ResumeScore(BaseModel):
+    candidate_type: str = "unknown"
+    overall_score: int = 0
+    breakdown: ScoreBreakdown
+    quality: ResumeQuality
+    strengths: list[str] = []
+    weaknesses: list[str] = []
+    recommendations: list[str] = []

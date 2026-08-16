@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.services.resume_parser import extract_text_from_pdf
+from app.services.resume_pipeline import analyze_resume
 from app.database.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
@@ -44,20 +45,31 @@ def upload_resume(
     with open(file_path, "wb") as buffer:
         buffer.write(file.file.read())
 
-    extracted_text = extract_text_from_pdf(str(file_path))
+    # Step 1: Extract text from PDF
+    extracted_text = extract_text_from_pdf(
+        str(file_path)
+    )
 
+    # Step 2: Analyze extracted resume
+    resume_analysis = analyze_resume(
+        extracted_text
+    )
+
+    # Step 3: Store resume
     resume = create_resume(
         db=db,
         user_id=current_user.id,
         file_name=file.filename,
         file_path=str(file_path),
         extracted_text=extracted_text,
+        analysis=resume_analysis.model_dump(),
     )
 
     return {
         "message": "Resume uploaded successfully",
         "resume_id": str(resume.id),
         "file_name": resume.file_name,
+        "analysis": resume_analysis.model_dump(),
     }
 
 @router.get(
@@ -72,6 +84,36 @@ def get_my_resumes(
         db=db,
         user_id=current_user.id,
     )
+
+@router.get("/{resume_id}/analysis")
+def get_resume_analysis(
+    resume_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    resume = get_resume_by_id(
+        db=db,
+        resume_id=resume_id,
+        user_id=current_user.id,
+    )
+
+    if resume is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found",
+        )
+
+    if resume.analysis is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume analysis not available",
+        )
+
+    return {
+        "resume_id": str(resume.id),
+        "file_name": resume.file_name,
+        "analysis": resume.analysis,
+    }
 
 @router.delete("/{resume_id}")
 def delete_resume(

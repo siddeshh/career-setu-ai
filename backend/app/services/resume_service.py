@@ -8,12 +8,14 @@ def create_resume(
         file_name: str,
         file_path: str,
         extracted_text: str,
+        analysis=None,
 ):
     resume = Resume(
         user_id=user_id,
         file_name=file_name,
         file_path=file_path,
-        extracted_text=extracted_text
+        extracted_text=extracted_text,
+        analysis=analysis,
     )
 
     db.add(resume)
