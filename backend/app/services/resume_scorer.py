@@ -5,6 +5,7 @@ from app.schemas.resume_analysis import (
     ScoreBreakdown,
 )
 
+import re
 
 def detect_candidate_type(
     resume: ResumeAnalysis,
@@ -27,6 +28,66 @@ def detect_candidate_type(
 
     return "unknown"
 
+def has_measurable_impact(
+    text: str,
+) -> bool:
+
+    if not text:
+        return False
+
+    text_lower = text.lower()
+
+    # Explicit numerical evidence
+    numerical_patterns = [
+        r"\b\d+(?:\.\d+)?%",
+        r"\b\d+\+",
+        r"\b\d+(?:,\d{3})*\s+(?:users|documents|requests|records|files|candidates|transactions)\b",
+        r"\b(?:over|more than|approximately|around)\s+\d+\b",
+    ]
+
+    for pattern in numerical_patterns:
+        if re.search(pattern, text_lower):
+            return True
+
+    # Explicit result-oriented language combined
+    # with a measurable technical concept
+    impact_verbs = (
+        "improved",
+        "increased",
+        "reduced",
+        "decreased",
+        "achieved",
+        "optimized",
+    )
+
+    measurable_terms = (
+        "accuracy",
+        "performance",
+        "latency",
+        "speed",
+        "efficiency",
+        "processing time",
+        "response time",
+        "throughput",
+        "error rate",
+        "success rate",
+    )
+
+    has_impact_verb = any(
+        verb in text_lower
+        for verb in impact_verbs
+    )
+
+    has_measurable_term = any(
+        term in text_lower
+        for term in measurable_terms
+    )
+
+    return (
+        has_impact_verb
+        and has_measurable_term
+    )
+
 def calculate_resume_quality(
     resume: ResumeAnalysis,
 ) -> ResumeQuality:
@@ -40,17 +101,63 @@ def calculate_resume_quality(
 
     content_score = 0
 
+    # Professional summary
     if resume.summary:
-        content_score += 25
+        content_score += 15
 
+    # Skills
     if resume.skills:
-        content_score += 25
+        content_score += 15
 
+    # Education
     if resume.education:
-        content_score += 20
+        content_score += 15
 
-    if resume.projects or resume.experience:
-        content_score += 30
+    # Experience
+    if resume.experience:
+        content_score += 15
+
+    # Projects
+    if resume.projects:
+        project_points = 0
+
+    for project in resume.projects:
+
+        if project.title:
+            project_points += 2
+
+        if project.description:
+            project_points += 2
+
+        if project.skills:
+            project_points += 1
+
+        if project.start_date or project.end_date:
+            project_points += 1
+
+        if project.url:
+            project_points += 1
+
+        if has_measurable_impact(
+            project.description
+        ):
+            project_points += 2
+
+    # Maximum 25 points from projects
+    content_score += min(
+        25,
+        project_points,
+    )
+
+    # Certifications
+    if resume.certifications:
+        content_score += 5
+
+    # Maximum content score = 100
+    content_score = min(
+        100,
+        content_score,
+    )
 
     # --------------------------------
     # ATS readiness
@@ -58,20 +165,41 @@ def calculate_resume_quality(
 
     ats_score = 0
 
+    # Contact information
     if resume.full_name:
-        ats_score += 20
+        ats_score += 15
 
     if resume.email:
-        ats_score += 20
+        ats_score += 15
 
     if resume.phone:
-        ats_score += 20
+        ats_score += 10
+
+    # Resume structure
+    if resume.summary:
+        ats_score += 10
 
     if resume.skills:
-        ats_score += 20
+        ats_score += 15
 
     if resume.education:
-        ats_score += 20
+        ats_score += 10
+
+    # Practical content
+    if resume.experience:
+        ats_score += 10
+
+    elif resume.projects:
+        # Students can demonstrate practical experience
+        # through projects.
+        ats_score += 7
+
+    # Additional sections
+    if resume.certifications:
+        ats_score += 5
+
+    if resume.languages:
+        ats_score += 3
 
     # --------------------------------
     # Formatting / structure
@@ -145,6 +273,28 @@ def calculate_resume_quality(
         recommendations.append(
             "Add relevant skills that are supported "
             "by your actual projects or experience"
+        )
+
+    if resume.projects:
+
+        projects_without_impact = [
+            project.title
+            for project in resume.projects
+            if not has_measurable_impact(
+                project.description
+            )
+        ]
+    
+
+    if projects_without_impact:
+        issues.append(
+            "Project descriptions lack measurable impact"
+        )
+
+        recommendations.append(
+            "Add measurable results such as accuracy, "
+            "performance improvements, users, documents "
+            "processed, or processing time reductions"
         )
 
     # --------------------------------

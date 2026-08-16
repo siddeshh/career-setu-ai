@@ -15,6 +15,9 @@ text = extract_text_from_pdf(file_path)
 
 resume_analysis = analyze_resume(text)
 
+print("SKILL COUNT:", len(resume_analysis.skills))
+print("SKILLS:", resume_analysis.skills)
+
 score = calculate_resume_score(
     resume_analysis
 )
