@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ProjectAnalysis(BaseModel):
@@ -8,7 +8,7 @@ class ProjectAnalysis(BaseModel):
     team_size: int | None = None
     role: str | None = None
     description: str | None = None
-    skills: list[str] = []
+    skills: list[str] = Field(default_factory=list)
     url: str | None = None
 
 
@@ -18,7 +18,7 @@ class ExperienceAnalysis(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     description: str | None = None
-    skills: list[str] = []
+    skills: list[str] = Field(default_factory=list)
 
 
 class ResumeAnalysis(BaseModel):
@@ -27,13 +27,13 @@ class ResumeAnalysis(BaseModel):
     phone: str | None = None
     summary: str | None = None
 
-    skills: list[str] = []
-    education: list[str] = []
-    experience: list[ExperienceAnalysis] = []
-    projects: list[ProjectAnalysis] = []
-    certifications: list[str] = []
-    achievements: list[str] = []
-    languages: list[str] = []
+    skills: list[str] = Field(default_factory=list)
+    education: list[str] = Field(default_factory=list)
+    experience: list[ExperienceAnalysis] = Field(default_factory=list)
+    projects: list[ProjectAnalysis] = Field(default_factory=list)
+    certifications: list[str] = Field(default_factory=list)
+    achievements: list[str] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
 
 
 class ScoreBreakdown(BaseModel):
@@ -52,8 +52,8 @@ class ResumeQuality(BaseModel):
     ats_score: int = 0
     content_score: int = 0
     formatting_score: int = 0
-    issues: list[str] = []
-    recommendations: list[str] = []
+    issues: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
 
 
 class ResumeScore(BaseModel):
@@ -61,6 +61,17 @@ class ResumeScore(BaseModel):
     overall_score: int = 0
     breakdown: ScoreBreakdown
     quality: ResumeQuality
-    strengths: list[str] = []
-    weaknesses: list[str] = []
-    recommendations: list[str] = []
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+
+
+class ResumeImprovement(BaseModel):
+    section: str
+    priority: str
+    issue: str
+    recommendation: str
+
+
+class ResumeImprovementResponse(BaseModel):
+    improvements: list[ResumeImprovement] = Field(default_factory=list)
