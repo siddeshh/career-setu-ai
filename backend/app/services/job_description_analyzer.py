@@ -138,65 +138,37 @@ def _extract_section(
 
 def _extract_job_title(text: str) -> str | None:
     """
-    Try to extract a job title from common JD formats.
+    Extract job title from common job description formats.
     """
 
-    lines = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip()
-    ]
 
-    title_patterns = [
-        r"job title\s*[:\-]\s*(.+)",
-        r"position\s*[:\-]\s*(.+)",
-        r"role\s*[:\-]\s*(.+)",
-    ]
+    match = re.search(
+        r"job\s*title\s*:\s*(.*?)(?=\s+company\s*:|\s+location\s*:|\s+requirements?\s*:|\s+responsibilities\s*:|$)",
+        text,
+        re.IGNORECASE,
+    )
 
-    for line in lines:
-
-        for pattern in title_patterns:
-
-            match = re.search(
-                pattern,
-                line,
-                re.IGNORECASE,
-            )
-
-            if match:
-                return match.group(1).strip()
+    if match:
+        return match.group(1).strip()
 
     return None
 
 
 def _extract_company(text: str) -> str | None:
     """
-    Try to extract company name from common JD formats.
+    Extract company name from common job description formats.
     """
 
-    lines = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip()
-    ]
 
-    patterns = [
-        r"company\s*[:\-]\s*(.+)",
-        r"organization\s*[:\-]\s*(.+)",
-    ]
 
-    for line in lines:
+    match = re.search(
+        r"company\s*:\s*(.*?)(?=\s+location\s*:|\s+we\s+are\s+looking|\s+requirements?\s*:|\s+responsibilities\s*:|$)",
+        text,
+        re.IGNORECASE,
+    )
 
-        for pattern in patterns:
-
-            match = re.search(
-                pattern,
-                line,
-                re.IGNORECASE,
-            )
-
-            if match:
-                return match.group(1).strip()
+    if match:
+        return match.group(1).strip()
 
     return None
 
